@@ -1,4 +1,5 @@
 const express = require('express');
+const { sendStatus } = require('express/lib/response');
 const router = express.Router();
 const pool = require('../modules/pool')
 // const pg = require('pg');
@@ -44,12 +45,36 @@ let songs = [
     }
 ];
 
+// router.get('/:id', (req, res) => {
+//     // res.send(songs);
+//     // grab a value from the request url
+//     const idToGet = req.params.id;
+//     // check SQL query text in Postico first!
+//     let queryText = 'SELECT * FROM "songs" WHERE id=$1;';
+//     // the second array argument is optional
+//     // and is used when we add sanitized parameters to queryText
+//     pool.query(queryText, [idToGet])
+//         .then((result) => {
+//             console.log('Song with ID', idToGet)
+//             res.send(result.rows);
+//         })
+//         .catch((err) => {
+//             console.log('Error making query', idToGet, queryText, err);
+//             res.sendStatus(500);
+//         })
+// });
+
 router.get('/', (req, res) => {
     // res.send(songs);
+    // grab a value from the request url
+    // const idToGet = req.params.id;
     // check SQL query text in Postico first!
-    let queryText = 'SELECT * FROM "songs";';
+    let queryText = 'SELECT * FROM "songs" ORDER BY "rank";';
+    // the second array argument is optional
+    // and is used when we add sanitized parameters to queryText
     pool.query(queryText)
         .then((result) => {
+            console.log('Song with ID')
             res.send(result.rows);
         })
         .catch((err) => {
@@ -76,5 +101,59 @@ router.post('/', (req, res) => {
             res.sendStatus(500);
         })
 });
+
+// route parameters can only be made of 
+router.delete('/:id', (req, res) => {
+    let reqId = req.params.id;
+    console.log('Delete ID', reqId);
+    let queryText = 'DELETE FROM "songs" WHERE "id" = $1;';
+    pool.query(queryText, [reqId])
+        .then((result) => {
+            console.log('Song deleted');
+            res.sendStatus(200);
+        })
+        .catch((error) => {
+            console.log('Error making database query', queryText, error);
+            res.sendStatus(500);
+        })
+});
+
+// has .body like post and has .params like delete
+router.put('/:id', (req, res) => {
+    let idToUpdate = req.params.id;
+    console.log(req.body);
+    console.log(idToUpdate);
+
+    let sqlText = '';
+    if(req.body.direction === 'up') {
+            sqlText = `
+            UPDATE "songs"
+            SET "rank" = "rank" - 1
+            WHERE "id" = $1;
+            `
+    } else if (req.body.direction === 'down') {
+        sqlText = `
+        UPDATE "songs"
+        SET "rank" = "rank" + 1
+        WHERE "id" = $1;
+        `
+    } else {
+        // bad req...
+        res.sendStatus(400);
+        // NOTHING ELSE HAPPENS
+        return;
+    }
+
+    let sqlValues = [idToUpdate];
+    
+    pool.query(sqlText, sqlValues)
+    .then(result => {
+        res.sendStatus(200);
+    }).catch(err => {
+        console.log(err);
+        res.sendStatus(500);
+    })
+
+})
 
 module.exports = router;
